@@ -1,6 +1,4 @@
 images/
-go.work
-go.work.*
 *.md
 .gitignore
 Makefile
