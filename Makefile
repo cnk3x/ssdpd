@@ -2,14 +2,7 @@ VERSION := 0.3
 ALIREPO := registry.cn-shenzhen.aliyuncs.com/
 
 build:
-	docker buildx build \
-	--platform linux/amd64 \
-	-t cnk3x/ssdpd:latest \
-	-t cnk3x/ssdpd:$(VERSION) \
-	--build-arg  HTTP_PROXY=http://192.168.31.10:7890 \
-	--build-arg HTTPS_PROXY=http://192.168.31.10:7890 \
-	--load \
-	.
+	docker buildx build --platform linux/amd64 -t cnk3x/ssdpd:latest --load .
 
 push:
 	docker buildx build \
