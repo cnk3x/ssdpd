@@ -2,7 +2,7 @@ FROM golang:alpine as build
 
 WORKDIR /build
 
-ENV CGO_ENABLE=0 \
+ENV CGO_ENABLED=0 \
     GO111MODULE=on \
     GOPROXY=https://goproxy.cn
 
