@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -17,9 +16,9 @@ import (
 )
 
 type Options struct {
-	ConfigFile       string        `json:"-" flag:"config,file" short:"c" usage:"配置文件路径, 参数优先级: 文件>启动参数>环境变量"`
+	File             string        `json:"-" flag:"config" short:"c" usage:"配置文件路径, 参数优先级: 文件>启动参数>环境变量"`
 	Interfaces       []string      `json:"interfaces" usage:"指定网卡介质"`
-	Location         string        `json:"localtion" short:"l" usage:"指定服务描述的的访问地址"`
+	Location         string        `json:"location" short:"l" usage:"指定服务描述的的访问地址"`
 	Port             int           `json:"port" short:"p" usage:"指定描述访问的端口， 0为随机端口"`
 	FriendlyName     string        `json:"friendly_name" short:"n" usage:"友好名称"`
 	Manufacturer     string        `json:"manufacturer" usage:"制造商"`
@@ -38,75 +37,23 @@ type Options struct {
 	MaxAge           int           `json:"maxage" flag:"maxage" usage:"ssdp maxage"`
 }
 
-func (sOpts Options) Fill() Options {
-	if sOpts.FriendlyName == "" {
-		host, _ := os.Hostname()
-		sOpts.FriendlyName = host
-	}
-
-	if sOpts.AliveTick == 0 {
-		sOpts.AliveTick = 300 * time.Second
-	}
-
-	//最少间隔10秒
-	if sOpts.AliveTick < 10*time.Second {
-		sOpts.AliveTick = 10 * time.Second
-	}
-
-	if sOpts.Manufacturer == "" {
-		sOpts.Manufacturer = "cnk3x"
-	}
-
-	if sOpts.ManufacturerURL == "" {
-		sOpts.ManufacturerURL = "https://github.com/cnk3x"
-	}
-
-	if sOpts.ModelName == "" {
-		sOpts.ModelName = "SSDPD"
-	}
-
-	if sOpts.ModelNumber == "" {
-		sOpts.ModelNumber = "SSDPD v0"
-	}
-
-	if sOpts.ModelURL == "" {
-		sOpts.ModelURL = "https://github.com/cnk3x/ssdpd"
-	}
-
-	if sOpts.ModelType == "" {
-		sOpts.ModelType = "NAS"
-	}
-
-	if sOpts.ModelDescription == "" {
-		sOpts.ModelDescription = "SSDPD/NAS/WEB"
-	}
-
-	if sOpts.MaxAge <= 0 {
-		sOpts.MaxAge = 1900
-	}
-
-	if sOpts.Server == "" {
-		sOpts.Server = "cnk3x/ssdpd"
-	}
-
-	return sOpts
+func (options Options) ConfigFilePath() string {
+	return options.File
 }
 
 // 发送局域网SSDP广播, 让电脑端能发现设备并显示在网络列表里。
 func AdvertiseDevice(ctx context.Context, sOpts Options) (err error) {
-	sOpts = sOpts.Fill()
-
 	if sOpts.Port <= 1024 {
 		l, le := net.Listen("tcp", ":0")
 		if le != nil {
 			sOpts.Port = 20261
 		} else {
 			sOpts.Port = l.Addr().(*net.TCPAddr).Port
-			l.Close()
+			_ = l.Close()
 		}
 	}
 
-	ni, p4 := findNI(sOpts.Interfaces...)
+	ni, p4 := FindNI(sOpts.Interfaces...)
 	if ni != nil {
 		if sOpts.Location == "" {
 			sOpts.Location = fmt.Sprintf("%s:%d", p4.String(), sOpts.Port)
@@ -130,10 +77,8 @@ func AdvertiseDevice(ctx context.Context, sOpts Options) (err error) {
 	}
 
 	location := sOpts.Location
-	if location != "" {
-		if !strings.HasPrefix(location, "http") && !strings.Contains(location, "://") {
-			location = "http://" + location
-		}
+	if location != "" && !strings.Contains(location, ":/") {
+		location = "http://" + location
 	}
 
 	if sOpts.Verbose {
@@ -223,7 +168,7 @@ func handleDesc(opts Options) http.HandlerFunc {
 }
 
 // 查找合适的IPv4地址
-func p4FromAddrs(addrs []net.Addr) net.IP {
+func FromAddrs4(addrs []net.Addr) net.IP {
 	for _, addr := range addrs {
 		if in, ok := addr.(*net.IPNet); ok {
 			if !in.IP.IsLoopback() && !in.IP.IsUnspecified() {
@@ -237,13 +182,13 @@ func p4FromAddrs(addrs []net.Addr) net.IP {
 }
 
 // 通过名称查找可用的网络，找到合适的第一个就返回，如果没有指定名称，则从全部网络中查找
-func findNI(names ...string) (ni *net.Interface, p4 net.IP) {
+func FindNI(names ...string) (ni *net.Interface, p4 net.IP) {
 	contains := func(n string) bool {
 		if len(names) == 0 || (len(names) == 1 && names[0] == "") {
 			return true
 		}
-		for _, nane := range names {
-			if n == nane {
+		for _, name := range names {
+			if n == name {
 				return true
 			}
 		}
@@ -255,7 +200,7 @@ func findNI(names ...string) (ni *net.Interface, p4 net.IP) {
 		available := contains(i.Name) && i.Flags&(net.FlagRunning|net.FlagUp|net.FlagMulticast|net.FlagBroadcast) != 0 && len(i.HardwareAddr) > 0
 		if available {
 			addrs, _ := i.Addrs()
-			if p := p4FromAddrs(addrs); p != nil && !p.IsUnspecified() && p[0] != 172 {
+			if p := FromAddrs4(addrs); p != nil && !p.IsUnspecified() && p[0] != 172 {
 				ni, p4 = &i, p
 				return
 			}
