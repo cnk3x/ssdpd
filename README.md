@@ -49,7 +49,7 @@ docker run --name ssdpd --net host cnk3x/ssdpd \
     --model-number '我的型号 v0.1'
 
 # 第二种： 下载使用（仅 linux amd64）
-wget -O ssdpd https://github.com/cnk3x/ssdpd/releases/download/v0.3.0/ssdpd.linux.amd64
+wget -O ssdpd https://github.com/cnk3x/ssdpd/releases/download/v0.3.1/ssdpd.linux.amd64
 chmod +x ssdpd
 ./ssdpd \
     --friendly-name '我的NAS (超级牛)' \
